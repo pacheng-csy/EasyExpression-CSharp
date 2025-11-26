@@ -75,14 +75,21 @@ namespace EasyExpression
 
         #region public method
 
-        public List<KeyValuePair<string, string>> LoadArgument(Dictionary<string, string> keyValues)
+        //public List<KeyValuePair<string, string>> LoadArgument(Dictionary<string, string> keyValues)
+        //{
+        //    var result = new List<KeyValuePair<string, string>>();
+        //    LoadArgument(keyValues, result, ElementType == ElementType.Function);
+        //    return result;
+        //}
+
+        public List<KeyValuePair<string, string>> LoadArgument(Dictionary<string, object> keyValues)
         {
             var result = new List<KeyValuePair<string, string>>();
             LoadArgument(keyValues, result, ElementType == ElementType.Function);
             return result;
         }
 
-        private void LoadArgument(Dictionary<string, string> keyValues, List<KeyValuePair<string, string>> result, bool zeroInit = false)
+        private void LoadArgument(Dictionary<string, object> keyValues, List<KeyValuePair<string, string>> result, bool zeroInit = false)
         {
             if (!string.IsNullOrEmpty(DataString))
             {
@@ -93,7 +100,7 @@ namespace EasyExpression
                     {
                         if (keyValues.TryGetValue(param.Key, out var v))
                         {
-                            DataString = DataString.Replace(param.Key, string.IsNullOrEmpty(v) ? "0" : v);
+                            DataString = v is null ? null : DataString?.Replace(param.Key, v?.ToString());
                         }
                     }
                     RealityString = DataString;
@@ -104,7 +111,18 @@ namespace EasyExpression
                 {
                     if (keyValues.TryGetValue(DataString, out var v))
                     {
-                        RealityString = string.IsNullOrEmpty(v) && zeroInit ? "0" : v;
+                        if (zeroInit && v is string v1 && v1 == "")
+                        {
+                            RealityString = "0";
+                        }
+                        else if(v is null)
+                        {
+                            RealityString = null;
+                        }
+                        else
+                        {
+                            RealityString = v.ToString();
+                        }
                         result.Add(new KeyValuePair<string, string>(DataString, RealityString));
                     }
                     else
@@ -496,6 +514,8 @@ namespace EasyExpression
                     return (FunctionType.Seconds, FormulaAction.Seconds);
                 case "millseconds":
                     return (FunctionType.MillSeconds, FormulaAction.MillSeconds);
+                case "isnull":
+                    return (FunctionType.IsNull, FormulaAction.IsNull);
                 // 自定义函数实现
                 default:
                     throw new ExpressionException($"at {SourceExpressionString}: {key} 函数未定义");
@@ -1100,6 +1120,7 @@ namespace EasyExpression
                         case FunctionType.Minutes:
                         case FunctionType.Seconds:
                         case FunctionType.MillSeconds:
+                        case FunctionType.IsNull:
                             var paramsList = new List<object>();
                             if (childExp.ExpressionChildren.Count(x => x.ElementType != ElementType.Data) != 0)
                             {
@@ -1135,6 +1156,10 @@ namespace EasyExpression
 
         private object Convert2ObjectValue(string tag)
         {
+            if (tag == null)
+            {
+                return null;
+            }
             switch (tag)
             {
                 case "true":

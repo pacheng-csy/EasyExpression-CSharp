@@ -18,6 +18,34 @@ namespace EasyExpression.UnitTest
         }
 
         [TestMethod]
+        public void NullTest()
+        {
+            var expStr = "[ISNULL](obj)";
+            var exp = new Expression(expStr);
+            var dic = new Dictionary<string, object>()
+            {
+                {"obj",null}
+            };
+            exp.LoadArgument(dic);
+            var value = exp.Execute();
+            Assert.AreEqual(1d, value);
+        }
+
+        [TestMethod]
+        public void EmptyStringTest()
+        {
+            var expStr = "a==''";
+            var exp = new Expression(expStr);
+            var dic = new Dictionary<string, object>()
+            {
+                {"a",""}
+            };
+            exp.LoadArgument(dic);
+            var value = exp.Execute();
+            Assert.AreEqual(1d, value);
+        }
+
+        [TestMethod]
         public void NegativeTest()
         {
             var expStr = "3 * -2";
@@ -93,7 +121,7 @@ namespace EasyExpression.UnitTest
         public void StringTest()
         {
             var expStr = "a * (b + c) > d & [Contains](srcText,text)";
-            var dic = new Dictionary<string, string>
+            var dic = new Dictionary<string, object>
             {
                 { "a","3"},
                 { "b","1"},
@@ -112,7 +140,7 @@ namespace EasyExpression.UnitTest
         public void ParamsTest()
         {
             var expStr = "a * (b + c) + 5 - (30 / (d - 2) % [SUM](1,2,3))";
-            var dic = new Dictionary<string, string>
+            var dic = new Dictionary<string, object>
             {
                 { "a","3"},
                 { "b","1"},
@@ -129,7 +157,7 @@ namespace EasyExpression.UnitTest
         public void DateCompareTest()
         {
             var expStr = "'2024-05-27' == a";
-            var dic = new Dictionary<string, string>
+            var dic = new Dictionary<string, object>
             {
                 { "a","2024-05-27"},
             };
@@ -143,7 +171,7 @@ namespace EasyExpression.UnitTest
         public void DateMoreThenTest()
         {
             var expStr = "'2024-05-27' > a";
-            var dic = new Dictionary<string, string>
+            var dic = new Dictionary<string, object>
             {
                 { "a","2024-05-26"},
             };
@@ -157,7 +185,7 @@ namespace EasyExpression.UnitTest
         public void DateLessThanTest()
         {
             var expStr = "'2024-05-27' < a";
-            var dic = new Dictionary<string, string>
+            var dic = new Dictionary<string, object>
             {
                 { "a","2024-05-26"},
             };

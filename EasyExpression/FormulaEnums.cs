@@ -99,6 +99,10 @@
         /// </summary>
         MillSeconds = 18,
         /// <summary>
+        /// 是否为空
+        /// </summary>
+        IsNull = 19,
+        /// <summary>
         /// 自定义函数(delegate double Function(params object[] values))
         /// </summary>
         Customer = 100
