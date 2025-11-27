@@ -18,6 +18,10 @@
         /// 引用
         /// </summary>
         Reference = 3,
+        /// <summary>
+        /// 占位节点(为了补齐非运算造成的操作数累计差异)
+        /// </summary>
+        Placeholder = 4,
     }
 
     public enum FunctionType
