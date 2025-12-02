@@ -1019,7 +1019,14 @@ namespace EasyExpression
                         //当前数据是否为日期，如果为日期则按日期比较方式
                         if (!(result is DateTime) && !(value is DateTime))
                         {
-                            result = result == value ? 1d : 0d;
+                            if (value is double a && result is double b)
+                            {
+                                result = a == b ? 1d : 0d;
+                            }
+                            else
+                            {
+                                result = result == value ? 1d : 0d;
+                            }
                         }
                         else
                         {
@@ -1030,7 +1037,14 @@ namespace EasyExpression
                     case Operator.UnEquals:
                         if (!(result is DateTime) && !(value is DateTime))
                         {
-                            result = result != value ? 1d : 0d;
+                            if (value is double a && result is double b)
+                            {
+                                result = a != b ? 1d : 0d;
+                            }
+                            else
+                            {
+                                result = result != value ? 1d : 0d;
+                            }
                         }
                         else
                         {
