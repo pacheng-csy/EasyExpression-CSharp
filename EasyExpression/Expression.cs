@@ -89,6 +89,14 @@ namespace EasyExpression
             return result;
         }
 
+        [Obsolete("推荐使用 List<KeyValuePair<string, string>> LoadArgument(Dictionary<string, object> keyValues)")]
+        public List<KeyValuePair<string, string>> LoadArgument(Dictionary<string, string> keyValues)
+        {
+            var result = new List<KeyValuePair<string, string>>();
+            LoadArgument(keyValues.ToDictionary(x=>x.Key,x=>(object)x.Value), result, ElementType == ElementType.Function);
+            return result;
+        }
+
         private void LoadArgument(Dictionary<string, object> keyValues, List<KeyValuePair<string, string>> result, bool zeroInit = false)
         {
             if (!string.IsNullOrEmpty(DataString))
@@ -831,8 +839,8 @@ namespace EasyExpression
                 foreach (var list in operators)
                 {
                     //因为是倒序，所以起始位置是反的
-                    var startIndex = list.First();
-                    var endIndex = list.Last();
+                    var startIndex = list.Last();
+                    var endIndex = list.First();
                     //获取需要合并为子表达式的exp，+2是因为索引本身比数量小1，且操作符数量始终比操作数少1
                     var children = ExpressionChildren.Skip(startIndex).Take(endIndex - startIndex + 2).ToList();
                     var childrenOperators = new List<Operator>();
@@ -885,12 +893,12 @@ namespace EasyExpression
         {
             /*
              * eg:
-             * 序列为{2,3,1,3,3,2,3,3}, 输入为3，最终输出为各操作符映射到表达式节点的索引集合，要考虑非运算只需要一个操作数，其他运算需要2个操作数（{1},{3,4},{6,7}）。
+             * 序列为{2,3,1,3,3,2,3,3}, 输入为3，最终输出为各元素的索引集合，{1},{3,4},{6,7}
              */
             var result = new List<List<int>>();
             var operators = new List<int>();
             //此处倒序循环是为了方便后续做删除操作，否则删除后索引的变化会导致数组越界
-            for (var i = 0; i < oldOperators.Count; i++)
+            for (int i = oldOperators.Count - 1; i >= 0; i--)
             {
                 if (Operators[i].GetOperatorObj().Level == level)
                 {
@@ -1022,7 +1030,7 @@ namespace EasyExpression
                     case Operator.UnEquals:
                         if (!(result is DateTime) && !(value is DateTime))
                         {
-                            result = (double)result - (double)value != 0 ? 1d : 0d;
+                            result = result != value ? 1d : 0d;
                         }
                         else
                         {
@@ -1084,24 +1092,24 @@ namespace EasyExpression
                         //集合函数(参数不固定)
                         case FunctionType.Sum:
                         case FunctionType.Avg:
-                            var paramList = new List<object>();
-                            if (childExp.ExpressionChildren.Count(x => x.ElementType != ElementType.Data) != 0)
-                            {
-                                foreach (var child in childExp.ExpressionChildren)
-                                {
-                                    child.ExecuteChildren().ForEach(x =>
-                                    {
-                                        paramList.Add(x);
-                                    });
-                                }
-                            }
-                            else
-                            {
-                                var dataArray = (childExp.RealityString?.Split(',').ToList()) ?? throw new ExpressionException($"at {SourceExpressionString}: 函数 {childExp.FunctionType} 形参 {childExp.DataString} 映射到实参 {childExp.RealityString} 错误");
-                                paramList = dataArray.Select(x => (object)x).ToList();
-                            }
-                            v = childExp.Function.Invoke(paramList.ToArray());
-                            break;
+                            //var paramList = new List<object>();
+                            //if (childExp.ExpressionChildren.Count(x => x.ElementType != ElementType.Data) != 0)
+                            //{
+                            //    foreach (var child in childExp.ExpressionChildren)
+                            //    {
+                            //        child.ExecuteChildren().ForEach(x =>
+                            //        {
+                            //            paramList.Add(x);
+                            //        });
+                            //    }
+                            //}
+                            //else
+                            //{
+                            //    var dataArray = (childExp.RealityString?.Split(',').ToList()) ?? throw new ExpressionException($"at {SourceExpressionString}: 函数 {childExp.FunctionType} 形参 {childExp.DataString} 映射到实参 {childExp.RealityString} 错误");
+                            //    paramList = dataArray.Select(x => (object)x).ToList();
+                            //}
+                            //v = childExp.Function.Invoke(paramList.ToArray());
+                            //break;
                         //固定参数函数
                         case FunctionType.Customer:
                         case FunctionType.EDate:
@@ -1120,35 +1128,50 @@ namespace EasyExpression
                         case FunctionType.Minutes:
                         case FunctionType.Seconds:
                         case FunctionType.MillSeconds:
+                            v = BuildParams(childExp, v,allowNullParam:false);
+                            break;
                         case FunctionType.IsNull:
-                            var paramsList = new List<object>();
-                            if (childExp.ExpressionChildren.Count(x => x.ElementType != ElementType.Data) != 0)
-                            {
-                                foreach (var child in childExp.ExpressionChildren)
-                                {
-                                    child.ExecuteChildren().ForEach(x =>
-                                    {
-                                        paramsList.Add(x);
-                                    });
-                                }
-                            }
-                            else
-                            {
-                                paramsList = (childExp.RealityString?.Split(',').Select(x => (object)x).ToList());
-                            }
-                            try
-                            {
-                                v = childExp.Function.Invoke(paramsList?.ToArray());
-                            }
-                            catch
-                            {
-                                throw new ExpressionException($"at {SourceExpressionString}: 函数 {childExp.FunctionType} 形参 {childExp.DataString} 映射到实参 {childExp.RealityString} 错误");
-                            }
+                            v = BuildParams(childExp,v,allowNullParam:true);
                             break;
                     }
                     return v;
                 default:
                     throw new ExpressionException($"at {SourceExpressionString}: 未知表达式节点");
+            }
+        }
+
+        private object BuildParams(Expression childExp,object v,bool allowNullParam)
+        {
+            var paramsList = new List<object>();
+            if (childExp.ExpressionChildren.Count(x => x.ElementType != ElementType.Data) != 0)
+            {
+                foreach (var child in childExp.ExpressionChildren)
+                {
+                    child.ExecuteChildren().ForEach(x =>
+                    {
+                        paramsList.Add(x);
+                    });
+                }
+            }
+            else
+            {
+                if (allowNullParam && childExp.RealityString == null)
+                {
+                    paramsList.Add(null);
+                }
+                else
+                {
+                    paramsList = (childExp.RealityString?.Split(',').Select(x => (object)x).ToList());
+                }
+            }
+            try
+            {
+                v = childExp.Function.Invoke(paramsList?.ToArray());
+                return v;
+            }
+            catch
+            {
+                throw new ExpressionException($"at {SourceExpressionString}: 函数 {childExp.FunctionType} 形参 {childExp.DataString} 映射到实参 {childExp.RealityString} 错误");
             }
         }
 

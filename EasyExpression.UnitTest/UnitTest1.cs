@@ -20,18 +20,32 @@ namespace EasyExpression.UnitTest
         [TestMethod]
         public void NullTest()
         {
-            var expStr = "!a && !b";
+            var expStr = "[ISNULL](a)";
             var exp = new Expression(expStr);
             var dic = new Dictionary<string, object>()
             {
-                {"a",1},
-                {"b",0},
+                {"a",null},
             };
             exp.LoadArgument(dic);
             var value = exp.Execute();
             Assert.AreEqual(1d, value);
         }
 
+
+        [TestMethod]
+        public void NotTest()
+        {
+            var expStr = "!((![ISNULL](a)) && a != '' && (([ISNULL](b)) || b == '') || ((![ISNULL](b)) && b != '' && (([ISNULL](a)) || a == '')))";
+            var exp = new Expression(expStr);
+            var dic = new Dictionary<string, object>()
+            {
+                {"a",""},
+                {"b",""},
+            };
+            exp.LoadArgument(dic);
+            var value = exp.Execute();
+            Assert.AreEqual(1d, value);
+        }
 
         [TestMethod]
         public void EmptyStringTest()

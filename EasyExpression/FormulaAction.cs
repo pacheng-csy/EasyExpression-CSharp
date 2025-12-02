@@ -230,7 +230,7 @@ namespace EasyExpression
         [FunctionRemark("ISNULL", "[ISNULL]", "对象", "1. obj", "0（false）或者1（true）", "是否为空\r\n isnull(obj)")]
         public static object IsNull(params object[] values)
         {
-            return values == null ? 1d : 0d;
+            return values.FirstOrDefault() == null ? 1d : 0d;
         }
 
         #endregion
