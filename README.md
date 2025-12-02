@@ -48,6 +48,18 @@
     var value = exp.Excute();
  ```
 
+```
+    var expStr = "!((![ISNULL](a)) && a != '' && (([ISNULL](b)) || b == '') || ((![ISNULL](b)) && b != '' && (([ISNULL](a)) || a == '')))";
+    var exp = new Expression(expStr);
+    var dic = new Dictionary<string, object>()
+    {
+	    {"a",null},
+	    {"b","abc"},
+    };
+    exp.LoadArgument(dic);
+    var value = exp.Execute();
+ ```
+
 - 算术表达式
 
  ```

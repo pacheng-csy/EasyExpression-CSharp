@@ -15,7 +15,7 @@
     <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
     <Authors>Pablo Cheng</Authors>
     <FileVersion>1.0.0.5</FileVersion>
-    <Version>1.0.5</Version>
+    <Version>1.0.6</Version>
     <Description>支持逻辑表达式、算术表达式、条件表达式的解析及运算，支持自定义函数及函数嵌套，支持转义符</Description>
     <PackageReleaseNotes>新增IsNull函数</PackageReleaseNotes>
   </PropertyGroup>
