@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -261,6 +261,36 @@ namespace EasyExpression
             return result;
         }
 
+        /// <summary>
+        /// 解析过程中：前缀的 <see cref="Operator.Not"/> 已按顺序压入 <see cref="Expression.Operators"/>，
+        /// 每加入一个主操作数后，从运算符栈尾弹出连续的 Not，与「最后一个子节点」依次包裹成子表达式（!!x 为从内到外）。
+        /// 这样在 <see cref="RebuildExpression"/> 前即保证一元非与操作数对齐，且无需对整棵树再扫一遍。
+        /// </summary>
+        private static void AbsorbTrailingNotForLastOperand(Expression expression)
+        {
+            while (expression.Operators.Count > 0
+                   && expression.Operators[expression.Operators.Count - 1] == Operator.Not
+                   && expression.ExpressionChildren.Count > 0)
+            {
+                expression.Operators.RemoveAt(expression.Operators.Count - 1);
+                var i = expression.ExpressionChildren.Count - 1;
+                var operand = expression.ExpressionChildren[i];
+                var operandText = !string.IsNullOrEmpty(operand.SourceExpressionString)
+                    ? operand.SourceExpressionString
+                    : operand.DataString ?? string.Empty;
+                expression.ExpressionChildren[i] = new Expression
+                {
+                    ElementType = ElementType.Expression,
+                    ExpressionChildren = new List<Expression> { operand },
+                    Operators = new List<Operator> { Operator.Not },
+                    SourceExpressionString = "!" + operandText,
+                    DataString = "!" + operandText,
+                    Status = true,
+                    FunctionType = FunctionType.None
+                };
+            }
+        }
+
         private void Parse(Expression expression)
         {
             var lastBlock = MatchMode.None;
@@ -283,6 +313,7 @@ namespace EasyExpression
                                 DataString = matchScope.ChildrenExpressionString
                             };
                             expression.ExpressionChildren.Add(dataExp);
+                            AbsorbTrailingNotForLastOperand(expression);
                             lastBlock = MatchMode.Data;
                             index = matchScope.EndIndex;
                             continue;
@@ -336,6 +367,7 @@ namespace EasyExpression
                             DataString = matchScope.ChildrenExpressionString
                         };
                         expression.ExpressionChildren.Add(functionExp);
+                        AbsorbTrailingNotForLastOperand(expression);
                         var paramList = SplitParamObject(matchScope.ChildrenExpressionString);
                         paramList.ForEach(x =>
                         {
@@ -367,6 +399,7 @@ namespace EasyExpression
                                 continue;
                             }
                             expression.ExpressionChildren.Add(dataExp);
+                            AbsorbTrailingNotForLastOperand(expression);
                         }
                         index += str.Length - 1;
                         continue;
@@ -388,6 +421,7 @@ namespace EasyExpression
                 {
                     var expressionChildren = new Expression(matchScope.ChildrenExpressionString);
                     expression.ExpressionChildren.Add(expressionChildren);
+                    AbsorbTrailingNotForLastOperand(expression);
                 }
                 // 跳过已解析的块
                 index = matchScope.EndIndex;
