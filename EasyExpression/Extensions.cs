@@ -2,6 +2,7 @@
 using System.IO;
 using System.Reflection;
 using System.Xml.Serialization;
+using EasyExpression.Internal;
 
 namespace EasyExpression
 {
@@ -21,11 +22,15 @@ namespace EasyExpression
 
         public static OperatorAttribute GetOperatorObj(this Enum enumValue)
         {
+            if (enumValue is Operator op)
+            {
+                return OperatorInfoCache.GetAttribute(op);
+            }
+
             string value = enumValue.ToString();
             FieldInfo field = enumValue.GetType().GetField(value);
             object[] objs = field.GetCustomAttributes(typeof(OperatorAttribute), false);
-            OperatorAttribute attribute = (OperatorAttribute)objs[0];
-            return attribute;
+            return (OperatorAttribute)objs[0];
         }
     }
 }

@@ -223,7 +223,7 @@
         /// </summary>
         [Operator("小于等于", 3, "<=")]
         LessThanOrEquals = 14,
-        [Operator("负", 6, "!")]
+        [Operator("负", 6, "-")]
         Negative = 15,
     }
 

@@ -4,10 +4,12 @@ namespace EasyExpression
 {
     public class ExpressionException : Exception
     {
-        public override string Message { get; }
-        public ExpressionException(string message)
+        public ExpressionException(string message) : base(message)
         {
-            Message = message;
+        }
+
+        public ExpressionException(string message, Exception innerException) : base(message, innerException)
+        {
         }
     }
 }
