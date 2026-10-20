@@ -511,6 +511,50 @@ namespace EasyExpression.UnitTest
         }
 
         [TestMethod]
+        public void Concat_Literals_ReturnsJoinedString()
+        {
+            var exp = new Expression("[CONCAT]('ab','cd','ef')");
+            exp.LoadArgument();
+            Assert.AreEqual("abcdef", exp.Execute());
+        }
+
+        [TestMethod]
+        public void Concat_ArgumentsFromDictionary_ReturnsJoinedString()
+        {
+            var exp = new Expression("[CONCAT](a,b)");
+            exp.LoadArgument(new Dictionary<string, object> { { "a", "x" }, { "b", "y" } });
+            Assert.AreEqual("xy", exp.Execute());
+        }
+
+        [TestMethod]
+        public void Concat_NestedFunctionAndNumericValue_ReturnsJoinedString()
+        {
+            var exp = new Expression("[CONCAT]('d:',[TIMETOSTRING]('2024-05-27',yyyyMMdd),1)");
+            exp.LoadArgument();
+            Assert.AreEqual("d:202405271", exp.Execute());
+        }
+
+        [TestMethod]
+        public void Concat_NullArgument_TreatedAsEmptyString()
+        {
+            var withLiteral = new Expression("[CONCAT]('a',b)");
+            withLiteral.LoadArgument(new Dictionary<string, object> { { "b", null } });
+            Assert.AreEqual("a", withLiteral.Execute());
+
+            var allParams = new Expression("[CONCAT](a,b)");
+            allParams.LoadArgument(new Dictionary<string, object> { { "a", null }, { "b", "y" } });
+            Assert.AreEqual("y", allParams.Execute());
+        }
+
+        [TestMethod]
+        public void Concat_FunctionName_IsCaseInsensitive()
+        {
+            var exp = new Expression("[concat]('a','b')");
+            exp.LoadArgument();
+            Assert.AreEqual("ab", exp.Execute());
+        }
+
+        [TestMethod]
         public void Equals_Function_WhenFalse_ReturnsZero()
         {
             var exp = new Expression("[EQUALS](1,2)");
@@ -968,6 +1012,7 @@ namespace EasyExpression.UnitTest
             Ok("[SECONDS]('2024-01-02'-'2024-01-01')");
             Ok("[MILLSECONDS]('2024-01-02'-'2024-01-01')");
             Ok("[ISNULL](a)");
+            Ok("[CONCAT]('a','b')");
         }
 
         [TestMethod]
@@ -1002,6 +1047,216 @@ namespace EasyExpression.UnitTest
         {
             Assert.AreEqual(1d, Run("'x' != 'y'"));
         }
+
+        #region 回归测试（阶段0/1/2 修复）
+
+        private static object EvalValue(string formula)
+        {
+            var exp = new Expression(formula);
+            exp.LoadArgument();
+            return exp.Execute();
+        }
+
+        private static string EvalString(string formula)
+        {
+            return (string)EvalValue(formula);
+        }
+
+        [TestMethod]
+        public void Regression_WhitespaceExpression_ThrowsExpressionException()
+        {
+            Assert.ThrowsException<ExpressionException>(() => new Expression("   "));
+        }
+
+        [TestMethod]
+        public void Regression_SingleValueInParentheses_Evaluates()
+        {
+            Assert.AreEqual(2d, Run("(2)"));
+            Assert.AreEqual(-2d, Run("-(2)"));
+            Assert.AreEqual(2d, Run("[SUM]((2))"));
+            Assert.AreEqual(1d, Run("-(2)+3"));
+            Assert.AreEqual(3d, Run("(2)+1"));
+        }
+
+        [TestMethod]
+        public void Regression_IncompleteExpression_ThrowsExpressionException()
+        {
+            Assert.ThrowsException<ExpressionException>(() => new Expression("+"));
+            Assert.ThrowsException<ExpressionException>(() => new Expression("1 +"));
+            Assert.ThrowsException<ExpressionException>(() => new Expression("[SUM](1,2"));
+        }
+
+        [TestMethod]
+        public void Regression_StringLiterals_AreNotRewritten()
+        {
+            Assert.AreEqual("a==b", EvalString("'a==b'"));
+            Assert.AreEqual("x||y", EvalString("'x||y'"));
+            Assert.AreEqual("a&&b", EvalString("'a&&b'"));
+            Assert.AreEqual("a,b", EvalString("[CONCAT]('a,b')"));
+        }
+
+        [TestMethod]
+        public void Regression_DoubleCharOperators_RemainSupported()
+        {
+            // 兼容两种写法：&& / || / == 与 & / | / =
+            Assert.AreEqual(1d, Run("true && (1 == 1)"));
+            Assert.AreEqual(1d, Run("false || (1 == 1)"));
+            Assert.AreEqual(1d, Run("1 & 1"));
+            Assert.AreEqual(1d, Run("0 | 1"));
+            Assert.AreEqual(1d, Run("2 =< 5"));
+            Assert.AreEqual(1d, Run("5 => 3"));
+            Assert.AreEqual(1d, Run("[EQUALS](a,'a')", new Dictionary<string, object> { { "a", "a" } }));
+        }
+
+        [TestMethod]
+        public void Regression_UnterminatedString_ThrowsExpressionException()
+        {
+            Assert.ThrowsException<ExpressionException>(() => new Expression("a'"));
+        }
+
+        [TestMethod]
+        public void Regression_StringLiteral_Backslashes_ArePreserved()
+        {
+            Assert.AreEqual(@"C:\temp\file.txt", EvalString(@"'C:\temp\file.txt'"));
+            Assert.AreEqual("It's", EvalString(@"'It\'s'"));
+            Assert.AreEqual(@"a\b", EvalString(@"'a\\b'"));
+        }
+
+        [TestMethod]
+        public void Regression_VariableNames_AreNotPartiallyReplaced()
+        {
+            var concat = new Expression("[CONCAT](a,ab)");
+            concat.LoadArgument(new Dictionary<string, object> { { "a", "1" } });
+            Assert.AreEqual("1ab", concat.Execute());
+
+            var equals = new Expression("[EQUALS](a,'a')");
+            equals.LoadArgument(new Dictionary<string, object> { { "a", "X" } });
+            Assert.AreEqual(0d, equals.Execute());
+        }
+
+        [TestMethod]
+        public void Regression_LoadArgument_IsIdempotent_ForFunctions()
+        {
+            var exp = new Expression("[CONCAT](a,'a')");
+            exp.LoadArgument(new Dictionary<string, object> { { "a", "X" } });
+            Assert.AreEqual("Xa", exp.Execute());
+
+            exp.LoadArgument(new Dictionary<string, object> { { "a", "Y" } });
+            Assert.AreEqual("Ya", exp.Execute());
+        }
+
+        [TestMethod]
+        public void Regression_MissingVariable_ThrowsFriendlyExpressionException()
+        {
+            var exp = new Expression("a + 1");
+            exp.LoadArgument(new Dictionary<string, object>());
+            var ex = Assert.ThrowsException<ExpressionException>(() => exp.Execute());
+            StringAssert.Contains(ex.Message, "a");
+            StringAssert.Contains(ex.Message, "未提供实参");
+        }
+
+        [TestMethod]
+        public void Regression_EODate_December_EndOfMonth_DoesNotThrow()
+        {
+            Assert.AreEqual("20241231", EvalString("[TIMETOSTRING]([EODATE]('2024-12-15',0,E),yyyyMMdd)"));
+        }
+
+        [TestMethod]
+        public void Regression_StringLiteralComparison_ComparesText()
+        {
+            Assert.AreEqual(1d, Run("'abc' = 'abc'"));
+            Assert.AreEqual(1d, Run("'abc' != 'abd'"));
+        }
+
+        [TestMethod]
+        public void Regression_StringFunctions_AreNullSafe()
+        {
+            var nullArgs = new Dictionary<string, object> { { "a", null } };
+            Assert.AreEqual(0d, Run("[CONTAINS](a,'x')", nullArgs));
+            Assert.AreEqual(1d, Run("[EXCLUDING](a,'x')", nullArgs));
+            Assert.AreEqual(0d, Run("[STARTWITH](a,'x')", nullArgs));
+            Assert.AreEqual(0d, Run("[ENDWITH](a,'x')", nullArgs));
+            Assert.AreEqual(1d, Run("[DIFFERENT](a,'x')", nullArgs));
+        }
+
+        [TestMethod]
+        public void Regression_ExecuteWithDictionary_Overload_BindsAndEvaluates()
+        {
+            var exp = new Expression("a * 2");
+            Assert.AreEqual(8d, exp.Execute(new Dictionary<string, object> { { "a", 4 } }));
+        }
+
+        [TestMethod]
+        public void Regression_ExpressionOptions_Culture_IsUsedDuringBinding()
+        {
+            var exp = new Expression("a + 1", new ExpressionOptions
+            {
+                Culture = new System.Globalization.CultureInfo("de-DE")
+            });
+            exp.LoadArgument(new Dictionary<string, object> { { "a", 1.5 } });
+            Assert.AreEqual(2.5d, exp.Execute());
+        }
+
+        [TestMethod]
+        public void Regression_CustomFunction_RegisterAndUnregister()
+        {
+            Assert.IsTrue(FunctionRegistry.Register("TWICE", values => Convert.ToDouble(values[0]) * 2, 1, 1));
+            try
+            {
+                Assert.IsTrue(FunctionRegistry.Contains("twice"));
+                Assert.AreEqual(6d, Run("[TWICE](3)"));
+                Assert.AreEqual(6d, Run("[twice](3)"));
+            }
+            finally
+            {
+                Assert.IsTrue(FunctionRegistry.Unregister("TWICE"));
+            }
+
+            Assert.IsFalse(FunctionRegistry.Contains("TWICE"));
+            Assert.ThrowsException<ExpressionException>(() => new Expression("[TWICE](3)"));
+        }
+
+        [TestMethod]
+        public void Regression_CustomFunction_Arity_IsValidated()
+        {
+            FunctionRegistry.Register("ONEARG", values => values[0], 1, 1);
+            try
+            {
+                var exp = new Expression("[ONEARG](1,2)");
+                exp.LoadArgument();
+                Assert.ThrowsException<ExpressionException>(() => exp.Execute());
+            }
+            finally
+            {
+                FunctionRegistry.Unregister("ONEARG");
+            }
+        }
+
+        [TestMethod]
+        public void Regression_BoundObjectTypes_ArePreserved()
+        {
+            var timeSpan = new Expression("[DAYS](a)");
+            timeSpan.LoadArgument(new Dictionary<string, object> { { "a", TimeSpan.FromDays(3) } });
+            Assert.AreEqual(3d, timeSpan.Execute());
+
+            var boolean = new Expression("!a");
+            boolean.LoadArgument(new Dictionary<string, object> { { "a", false } });
+            Assert.AreEqual(1d, boolean.Execute());
+
+            var date = new Expression("a = '2024-01-01'");
+            date.LoadArgument(new Dictionary<string, object> { { "a", new DateTime(2024, 1, 1) } });
+            Assert.AreEqual(1d, date.Execute());
+        }
+
+        [TestMethod]
+        public void Regression_ExecuteWithoutLoadArgument_BindsEmptyArguments()
+        {
+            Assert.AreEqual(3d, new Expression("1+2").Execute());
+            Assert.AreEqual("abc", new Expression("'abc'").Execute());
+            Assert.AreEqual(6d, new Expression("[SUM](1,2,3)").Execute());
+        }
+
+        #endregion
 
         #endregion
 

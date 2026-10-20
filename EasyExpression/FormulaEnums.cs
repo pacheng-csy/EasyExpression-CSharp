@@ -107,6 +107,10 @@
         /// </summary>
         IsNull = 19,
         /// <summary>
+        /// 拼接字符串
+        /// </summary>
+        Concat = 20,
+        /// <summary>
         /// 自定义函数(delegate double Function(params object[] values))
         /// </summary>
         Customer = 100

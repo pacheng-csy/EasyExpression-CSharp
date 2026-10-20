@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Globalization;
 
 namespace EasyExpression.Internal
 {
@@ -8,292 +8,285 @@ namespace EasyExpression.Internal
     {
         internal static object Execute(Expression expression)
         {
-            var result = ExecuteChildren(expression);
-            return result.First();
+            return Evaluate(expression).ToObject();
         }
 
-        private static List<object> ExecuteChildren(Expression expression)
+        private static ExpressionValue Evaluate(Expression node)
         {
-            var childrenResults = new List<object>();
-            if (expression.ExpressionChildren.Count == 0)
+            if (node == null)
             {
-                childrenResults.Add(ExecuteNode(expression, expression));
-                return childrenResults;
+                throw new ExpressionException("表达式节点为空");
             }
 
-            foreach (var childExp in expression.ExpressionChildren)
+            switch (node.ElementType)
             {
-                childrenResults.Add(ExecuteNode(childExp, expression));
-            }
-
-            if (expression.Operators.Count == 0)
-            {
-                return childrenResults;
-            }
-
-            var result = childrenResults.First();
-            for (int i = 0; i < expression.Operators.Count; i++)
-            {
-                var value = expression.Operators[i] == Operator.Not || expression.Operators[i] == Operator.Negative
-                    ? childrenResults[i]
-                    : childrenResults[i + 1];
-
-                switch (expression.Operators[i])
-                {
-                    case Operator.None:
-                        break;
-                    case Operator.And:
-                        result = (double)result != 0d && (double)value != 0d ? 1d : 0d;
-                        break;
-                    case Operator.Or:
-                        result = (double)result != 0d || (double)value != 0d ? 1d : 0d;
-                        break;
-                    case Operator.Not:
-                        result = (double)value != 0d ? 0d : 1d;
-                        break;
-                    case Operator.Plus:
-                        result = (double)result + (double)value;
-                        break;
-                    case Operator.Subtract:
-                        if ((result is DateTime) && (value is DateTime))
-                        {
-                            result = (DateTime)result - (DateTime)value;
-                        }
-                        else
-                        {
-                            result = (double)result - (double)value;
-                        }
-
-                        break;
-                    case Operator.Multiply:
-                        result = (double)result * (double)value;
-                        break;
-                    case Operator.Divide:
-                        result = (double)result / (double)value;
-                        break;
-                    case Operator.Mod:
-                        result = (double)result % (double)value;
-                        break;
-                    case Operator.GreaterThan:
-                        if (!(result is DateTime) && !(value is DateTime))
-                        {
-                            result = (double)result > (double)value ? 1d : 0d;
-                        }
-                        else
-                        {
-                            result = (DateTime)result > (DateTime)value ? 1d : 0d;
-                        }
-
-                        break;
-                    case Operator.LessThan:
-                        if (!(result is DateTime) && !(value is DateTime))
-                        {
-                            result = (double)result < (double)value ? 1d : 0d;
-                        }
-                        else
-                        {
-                            result = (DateTime)result < (DateTime)value ? 1d : 0d;
-                        }
-
-                        break;
-                    case Operator.Equals:
-                        if (!(result is DateTime) && !(value is DateTime))
-                        {
-                            if (value is double a && result is double b)
-                            {
-                                result = a == b ? 1d : 0d;
-                            }
-                            else
-                            {
-                                result = result == value ? 1d : 0d;
-                            }
-                        }
-                        else
-                        {
-                            result = (DateTime)result == (DateTime)value ? 1d : 0d;
-                        }
-
-                        break;
-                    case Operator.UnEquals:
-                        if (!(result is DateTime) && !(value is DateTime))
-                        {
-                            if (value is double a && result is double b)
-                            {
-                                result = a != b ? 1d : 0d;
-                            }
-                            else
-                            {
-                                result = result != value ? 1d : 0d;
-                            }
-                        }
-                        else
-                        {
-                            result = (DateTime)result == (DateTime)value ? 0d : 1d;
-                        }
-
-                        break;
-                    case Operator.GreaterThanOrEquals:
-                        if (!(result is DateTime) && !(value is DateTime))
-                        {
-                            result = (double)result >= (double)value ? 1d : 0d;
-                        }
-                        else
-                        {
-                            result = (DateTime)result >= (DateTime)value ? 1d : 0d;
-                        }
-
-                        break;
-                    case Operator.LessThanOrEquals:
-                        if (!(result is DateTime) && !(value is DateTime))
-                        {
-                            result = (double)result <= (double)value ? 1d : 0d;
-                        }
-                        else
-                        {
-                            result = (DateTime)result <= (DateTime)value ? 1d : 0d;
-                        }
-
-                        break;
-                    case Operator.Negative:
-                        result = (double)value * -1;
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            childrenResults.Clear();
-            childrenResults.Add(result);
-            return childrenResults;
-        }
-
-        private static object ExecuteNode(Expression childExp, Expression context)
-        {
-            switch (childExp.ElementType)
-            {
-                case ElementType.Expression:
-                    return Execute(childExp);
                 case ElementType.Data:
-                    return Convert2ObjectValue(childExp.RealityString, context.SourceExpressionString);
+                case ElementType.Reference:
+                    return EvaluateData(node);
                 case ElementType.Function:
-                    if (childExp.Function == null)
-                    {
-                        throw new ExpressionException($"at {context.SourceExpressionString}: 不存在函数实例{childExp.FunctionType}");
-                    }
-
-                    object v = 0d;
-                    switch (childExp.FunctionType)
-                    {
-                        case FunctionType.None:
-                            v = childExp.Function.Invoke();
-                            break;
-                        case FunctionType.Sum:
-                        case FunctionType.Avg:
-                        case FunctionType.Customer:
-                        case FunctionType.EDate:
-                        case FunctionType.EODate:
-                        case FunctionType.NowTime:
-                        case FunctionType.TimeToString:
-                        case FunctionType.Round:
-                        case FunctionType.Contains:
-                        case FunctionType.ContainsExcept:
-                        case FunctionType.Equals:
-                        case FunctionType.StartWith:
-                        case FunctionType.EndWith:
-                        case FunctionType.Different:
-                        case FunctionType.Days:
-                        case FunctionType.Hours:
-                        case FunctionType.Minutes:
-                        case FunctionType.Seconds:
-                        case FunctionType.MillSeconds:
-                            v = BuildParams(childExp, v, context.SourceExpressionString, allowNullParam: false);
-                            break;
-                        case FunctionType.IsNull:
-                            v = BuildParams(childExp, v, context.SourceExpressionString, allowNullParam: true);
-                            break;
-                    }
-
-                    return v;
+                    return EvaluateFunction(node);
+                case ElementType.Expression:
+                case ElementType.Placeholder:
+                    return EvaluateOperator(node);
                 default:
-                    throw new ExpressionException($"at {context.SourceExpressionString}: 未知表达式节点");
+                    throw new ExpressionException($"at {node.SourceExpressionString}: 未知表达式节点");
             }
         }
 
-        private static object BuildParams(
-            Expression childExp,
-            object v,
-            string sourceExpressionString,
-            bool allowNullParam)
+        private static ExpressionValue EvaluateData(Expression node)
         {
-            var paramsList = new List<object>();
-            if (childExp.ExpressionChildren.Count(x => x.ElementType != ElementType.Data) != 0)
+            var culture = GetCulture(node);
+            if (node.HasBoundValue)
             {
-                foreach (var child in childExp.ExpressionChildren)
+                if (node.BoundValue == null)
                 {
-                    ExecuteChildren(child).ForEach(x => paramsList.Add(x));
+                    return ExpressionValue.NullValue();
+                }
+
+                // 外部传入的字符串沿用原有规则转换，其余类型保留其真实类型。
+                if (node.BoundValue is string text)
+                {
+                    return ExpressionValue.FromTextValue(text, culture);
+                }
+
+                return ExpressionValue.FromObject(node.BoundValue, culture);
+            }
+
+            if (node.IsLiteral)
+            {
+                return ExpressionValue.FromTextValue(node.DataString, culture);
+            }
+
+            if (!string.IsNullOrEmpty(node.RealityString)
+                && !string.Equals(node.RealityString, node.DataString, StringComparison.Ordinal))
+            {
+                return ExpressionValue.FromTextValue(node.RealityString, culture);
+            }
+
+            var value = ExpressionValue.FromTextValue(node.DataString, culture);
+            if (node.IsUnbound && value.Kind == ValueKind.Text)
+            {
+                return ExpressionValue.FromUnbound(value.Text);
+            }
+
+            return value;
+        }
+
+        private static ExpressionValue EvaluateOperator(Expression node)
+        {
+            if (node.Operators == null || node.Operators.Count == 0)
+            {
+                if (node.ExpressionChildren == null || node.ExpressionChildren.Count == 0)
+                {
+                    throw new ExpressionException($"at {node.SourceExpressionString}: 表达式不完整");
+                }
+
+                if (node.ExpressionChildren.Count == 1)
+                {
+                    return Evaluate(node.ExpressionChildren[0]);
+                }
+
+                throw new ExpressionException($"at {node.SourceExpressionString}: 数据与运算符不匹配");
+            }
+
+            if (node.ExpressionChildren == null || node.ExpressionChildren.Count == 0)
+            {
+                throw new ExpressionException($"at {node.SourceExpressionString}: 表达式缺少操作数");
+            }
+
+            var current = Evaluate(node.ExpressionChildren[0]);
+            for (var i = 0; i < node.Operators.Count; i++)
+            {
+                var op = node.Operators[i];
+                if (op == Operator.Not || op == Operator.Negative)
+                {
+                    current = ApplyUnary(op, current, node.SourceExpressionString);
+                    continue;
+                }
+
+                if (i + 1 >= node.ExpressionChildren.Count)
+                {
+                    throw new ExpressionException($"at {node.SourceExpressionString}: 运算符 {op} 缺少操作数");
+                }
+
+                var right = Evaluate(node.ExpressionChildren[i + 1]);
+                current = ApplyBinary(op, current, right, node.SourceExpressionString);
+            }
+
+            return current;
+        }
+
+        private static ExpressionValue ApplyUnary(Operator op, ExpressionValue value, string context)
+        {
+            switch (op)
+            {
+                case Operator.Not:
+                    return ExpressionValue.FromNumber(value.ToNumber(context) == 0d ? 1d : 0d);
+                case Operator.Negative:
+                    return ExpressionValue.FromNumber(-value.ToNumber(context));
+                default:
+                    throw new ExpressionException($"at {context}: 未知一元运算符 {op}");
+            }
+        }
+
+        private static ExpressionValue ApplyBinary(
+            Operator op,
+            ExpressionValue left,
+            ExpressionValue right,
+            string context)
+        {
+            switch (op)
+            {
+                case Operator.And:
+                    return ExpressionValue.FromNumber(
+                        left.ToNumber(context) != 0d && right.ToNumber(context) != 0d ? 1d : 0d);
+                case Operator.Or:
+                    return ExpressionValue.FromNumber(
+                        left.ToNumber(context) != 0d || right.ToNumber(context) != 0d ? 1d : 0d);
+                case Operator.Plus:
+                    return ExpressionValue.FromNumber(left.ToNumber(context) + right.ToNumber(context));
+                case Operator.Subtract:
+                    if (left.Kind == ValueKind.Date && right.Kind == ValueKind.Date)
+                    {
+                        return ExpressionValue.FromTimeSpan(left.Date - right.Date);
+                    }
+
+                    return ExpressionValue.FromNumber(left.ToNumber(context) - right.ToNumber(context));
+                case Operator.Multiply:
+                    return ExpressionValue.FromNumber(left.ToNumber(context) * right.ToNumber(context));
+                case Operator.Divide:
+                    return ExpressionValue.FromNumber(left.ToNumber(context) / right.ToNumber(context));
+                case Operator.Mod:
+                    return ExpressionValue.FromNumber(left.ToNumber(context) % right.ToNumber(context));
+                case Operator.GreaterThan:
+                    return ExpressionValue.FromNumber(Compare(left, right, context) > 0 ? 1d : 0d);
+                case Operator.LessThan:
+                    return ExpressionValue.FromNumber(Compare(left, right, context) < 0 ? 1d : 0d);
+                case Operator.GreaterThanOrEquals:
+                    return ExpressionValue.FromNumber(Compare(left, right, context) >= 0 ? 1d : 0d);
+                case Operator.LessThanOrEquals:
+                    return ExpressionValue.FromNumber(Compare(left, right, context) <= 0 ? 1d : 0d);
+                case Operator.Equals:
+                    return ExpressionValue.FromNumber(AreEqual(left, right) ? 1d : 0d);
+                case Operator.UnEquals:
+                    return ExpressionValue.FromNumber(AreEqual(left, right) ? 0d : 1d);
+                default:
+                    throw new ExpressionException($"at {context}: 未知二元运算符 {op}");
+            }
+        }
+
+        private static int Compare(ExpressionValue left, ExpressionValue right, string context)
+        {
+            if (left.Kind == ValueKind.Date && right.Kind == ValueKind.Date)
+            {
+                return left.Date.CompareTo(right.Date);
+            }
+
+            if (left.Kind == ValueKind.TimeSpan && right.Kind == ValueKind.TimeSpan)
+            {
+                return left.TimeSpan.CompareTo(right.TimeSpan);
+            }
+
+            return left.ToNumber(context).CompareTo(right.ToNumber(context));
+        }
+
+        private static bool AreEqual(ExpressionValue left, ExpressionValue right)
+        {
+            if (left.Kind == ValueKind.Null || right.Kind == ValueKind.Null)
+            {
+                return left.Kind == right.Kind;
+            }
+
+            if (left.Kind == ValueKind.Number && right.Kind == ValueKind.Number)
+            {
+                return left.Number == right.Number;
+            }
+
+            if (left.Kind == ValueKind.Date && right.Kind == ValueKind.Date)
+            {
+                return left.Date == right.Date;
+            }
+
+            if (left.Kind == ValueKind.TimeSpan && right.Kind == ValueKind.TimeSpan)
+            {
+                return left.TimeSpan == right.TimeSpan;
+            }
+
+            if (IsTextual(left) && IsTextual(right))
+            {
+                return string.Equals(left.Text ?? string.Empty, right.Text ?? string.Empty, StringComparison.Ordinal);
+            }
+
+            return false;
+        }
+
+        private static bool IsTextual(ExpressionValue value)
+        {
+            return value.Kind == ValueKind.Text || value.Kind == ValueKind.Unbound;
+        }
+
+        private static ExpressionValue EvaluateFunction(Expression node)
+        {
+            var definition = ResolveDefinition(node);
+            var function = node.Function ?? (definition == null ? null : definition.Function);
+            if (function == null)
+            {
+                throw new ExpressionException($"at {node.SourceExpressionString}: 不存在函数实例{node.FunctionType}");
+            }
+
+            var parameters = new List<object>();
+            if (node.ExpressionChildren != null)
+            {
+                foreach (var child in node.ExpressionChildren)
+                {
+                    parameters.Add(Evaluate(child).ToObject());
                 }
             }
-            else
+
+            if (definition != null
+                && (parameters.Count < definition.MinArgs || parameters.Count > definition.MaxArgs))
             {
-                if (allowNullParam && childExp.RealityString == null)
-                {
-                    paramsList.Add(null);
-                }
-                else
-                {
-                    paramsList = childExp.RealityString?.Split(',').Select(x => (object)x).ToList();
-                }
+                throw new ExpressionException(
+                    $"at {node.SourceExpressionString}: 函数 {definition.Name} 参数数量不正确，期望 {definition.MinArgs}-{definition.MaxArgs} 个，实际 {parameters.Count} 个");
             }
 
             try
             {
-                v = childExp.Function.Invoke(paramsList?.ToArray());
-                return v;
+                return ExpressionValue.FromObject(function(parameters.ToArray()), GetCulture(node));
             }
-            catch
+            catch (ExpressionException)
+            {
+                throw;
+            }
+            catch (Exception ex)
             {
                 throw new ExpressionException(
-                    $"at {sourceExpressionString}: 函数 {childExp.FunctionType} 形参 {childExp.DataString} 映射到实参 {childExp.RealityString} 错误");
+                    $"at {node.SourceExpressionString}: 函数 {node.FunctionName ?? node.FunctionType.ToString()} 形参 {node.DataString} 执行失败: {ex.Message}",
+                    ex);
             }
         }
 
-        private static object Convert2ObjectValue(string tag, string sourceExpressionString)
+        private static FunctionDefinition ResolveDefinition(Expression node)
         {
-            if (tag == null)
+            FunctionDefinition definition = null;
+            if (!string.IsNullOrEmpty(node.FunctionName))
             {
-                return null;
+                FunctionRegistry.TryGet(node.FunctionName, out definition);
             }
 
-            switch (tag)
+            if (definition == null)
             {
-                case "true":
-                    return 1d;
-                case "false":
-                    return 0d;
-                case "1":
-                    return 1d;
-                case "0":
-                    return 0d;
-                default:
-                    if (tag.EndsWith("%"))
-                    {
-                        return double.TryParse(tag.Trim('%'), out double percentResult)
-                            ? percentResult * 0.01d
-                            : throw new ExpressionException($"at {sourceExpressionString}: {tag} 不是数值类型");
-                    }
-
-                    if (double.TryParse(tag, out double result))
-                    {
-                        return result;
-                    }
-
-                    if (DateTime.TryParse(tag, out var time))
-                    {
-                        return time;
-                    }
-
-                    return tag;
+                FunctionRegistry.TryGetByType(node.FunctionType, out definition);
             }
+
+            return definition;
+        }
+
+        private static CultureInfo GetCulture(Expression node)
+        {
+            return node.Options != null && node.Options.Culture != null
+                ? node.Options.Culture
+                : ExpressionOptions.Default.Culture;
         }
     }
 }

@@ -57,32 +57,50 @@ namespace EasyExpression
         [FunctionRemark("CONTAINS", "[CONTAINS]", "字符串", "1. source \r\n 2. target", "0（false）或者1（true）", "包含\r\nsource.contains(target)")]
         public static object Contains(params object[] values)
         {
-            return (values[0].ToString()).Contains(values[1].ToString()) ? 1d : 0d;
+            return ToText(values, 0).Contains(ToText(values, 1)) ? 1d : 0d;
         }
         [FunctionRemark("EXCLUDING", "[EXCLUDING]", "字符串", "1. source \r\n 2. target", "0（false）或者1（true）", "不包含\r\nsource.excluding(target)")]
         public static object Excluding(params object[] values)
         {
-            return ((string)values[0]).Contains((string)values[1]) ? 0d : 1d;
+            return ToText(values, 0).Contains(ToText(values, 1)) ? 0d : 1d;
         }
         [FunctionRemark("STARTWITH", "[STARTWITH]", "字符串", "1. source \r\n 2. target", "0（false）或者1（true）", "开头是\r\nsource.startwith(target)")]
         public static object StartWith(params object[] values)
         {
-            return ((string)values[0]).StartsWith((string)values[1]) ? 1d : 0d;
+            return ToText(values, 0).StartsWith(ToText(values, 1)) ? 1d : 0d;
         }
         [FunctionRemark("ENDWITH", "[ENDWITH]", "字符串", "1. source \r\n 2. target", "0（false）或者1（true）", "结尾是\r\nsource.endwith(target)")]
         public static object EndWith(params object[] values)
         {
-            return (values[0].ToString()).EndsWith(values[1].ToString()) ? 1d : 0d;
+            return ToText(values, 0).EndsWith(ToText(values, 1)) ? 1d : 0d;
         }
         [FunctionRemark("EQUALS", "[EQUALS]", "字符串", "1. source \r\n 2. target", "0（false）或者1（true）", "完全匹配\r\nsource.equals(target)")]
         public static object Equals(params object[] values)
         {
-            return (values[0]).Equals(values[1]) ? 1d : 0d;
+            return object.Equals(GetValue(values, 0), GetValue(values, 1)) ? 1d : 0d;
         }
         [FunctionRemark("DIFFERENT", "[DIFFERENT]", "字符串", "1. source \r\n 2. target", "0（false）或者1（true）", "不匹配\r\nsource.different(target)")]
         public static object Different(params object[] values)
         {
-            return ((string)values[0]).Equals((string)values[1]) ? 0d : 1d;
+            return object.Equals(GetValue(values, 0), GetValue(values, 1)) ? 0d : 1d;
+        }
+
+        private static object GetValue(object[] values, int index)
+        {
+            return values != null && index < values.Length ? values[index] : null;
+        }
+
+        private static string ToText(object[] values, int index)
+        {
+            var value = GetValue(values, index);
+            return value == null ? string.Empty : value.ToString();
+        }
+        [FunctionRemark("CONCAT", "[CONCAT]", "字符串", "1. value \r\n 2. value ...", "字符串", "拼接\r\n[CONCAT]('a','b')，返回ab\r\n参数以英文逗号分隔，无数量限制，null参数按空字符串处理")]
+        public static object Concat(params object[] values)
+        {
+            return values == null
+                ? string.Empty
+                : string.Concat(values.Select(x => x?.ToString() ?? string.Empty));
         }
 
         #endregion
@@ -148,7 +166,7 @@ namespace EasyExpression
                             return new DateTime(startTime.Year, startTime.Month, 1);
                         case "e":
                         case "E":
-                            return new DateTime(startTime.Year, startTime.Month + 1, 1).AddDays(-1);
+                            return new DateTime(startTime.Year, startTime.Month, 1).AddMonths(1).AddDays(-1);
                     }
                 }
             }
