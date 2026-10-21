@@ -110,7 +110,7 @@ namespace EasyExpression.Internal
                 }
 
                 var right = Evaluate(node.ExpressionChildren[i + 1]);
-                current = ApplyBinary(op, current, right, node.SourceExpressionString);
+                current = ApplyBinary(op, current, right, node);
             }
 
             return current;
@@ -133,8 +133,9 @@ namespace EasyExpression.Internal
             Operator op,
             ExpressionValue left,
             ExpressionValue right,
-            string context)
+            Expression node)
         {
+            var context = node.SourceExpressionString;
             switch (op)
             {
                 case Operator.And:
@@ -155,7 +156,7 @@ namespace EasyExpression.Internal
                 case Operator.Multiply:
                     return ExpressionValue.FromNumber(left.ToNumber(context) * right.ToNumber(context));
                 case Operator.Divide:
-                    return ExpressionValue.FromNumber(left.ToNumber(context) / right.ToNumber(context));
+                    return Divide(left, right, node, context);
                 case Operator.Mod:
                     return ExpressionValue.FromNumber(left.ToNumber(context) % right.ToNumber(context));
                 case Operator.GreaterThan:
@@ -172,6 +173,30 @@ namespace EasyExpression.Internal
                     return ExpressionValue.FromNumber(AreEqual(left, right) ? 0d : 1d);
                 default:
                     throw new ExpressionException($"at {context}: 未知二元运算符 {op}");
+            }
+        }
+
+        private static ExpressionValue Divide(
+            ExpressionValue left,
+            ExpressionValue right,
+            Expression node,
+            string context)
+        {
+            var dividend = left.ToNumber(context);
+            var divisor = right.ToNumber(context);
+            if (divisor != 0d)
+            {
+                return ExpressionValue.FromNumber(dividend / divisor);
+            }
+
+            switch (GetOptions(node).DivisionByZero)
+            {
+                case DivisionByZeroBehavior.Zero:
+                    return ExpressionValue.FromNumber(0d);
+                case DivisionByZeroBehavior.Throw:
+                    throw new ExpressionException($"at {context}: 除数不能为 0");
+                default:
+                    return ExpressionValue.FromNumber(dividend / divisor);
             }
         }
 
@@ -228,6 +253,19 @@ namespace EasyExpression.Internal
         private static ExpressionValue EvaluateFunction(Expression node)
         {
             var definition = ResolveDefinition(node);
+            if (definition != null)
+            {
+                if (definition.Type == FunctionType.If)
+                {
+                    return EvaluateIf(node);
+                }
+
+                if (definition.Type == FunctionType.Case)
+                {
+                    return EvaluateCase(node);
+                }
+            }
+
             var function = node.Function ?? (definition == null ? null : definition.Function);
             if (function == null)
             {
@@ -266,6 +304,42 @@ namespace EasyExpression.Internal
             }
         }
 
+        private static ExpressionValue EvaluateIf(Expression node)
+        {
+            var children = node.ExpressionChildren;
+            if (children == null || children.Count != 3)
+            {
+                throw new ExpressionException($"at {node.SourceExpressionString}: IF 需要 3 个参数");
+            }
+
+            var condition = Evaluate(children[0]).ToNumber(node.SourceExpressionString);
+            return Evaluate(condition != 0d ? children[1] : children[2]);
+        }
+
+        private static ExpressionValue EvaluateCase(Expression node)
+        {
+            var children = node.ExpressionChildren;
+            if (children == null || children.Count < 2)
+            {
+                throw new ExpressionException($"at {node.SourceExpressionString}: CASE 至少需要 2 个参数");
+            }
+
+            var value = Evaluate(children[0]);
+            var pairCount = (children.Count - 1) / 2;
+            var hasDefault = (children.Count - 1) % 2 == 1;
+            for (var i = 0; i < pairCount; i++)
+            {
+                if (AreEqual(value, Evaluate(children[1 + i * 2])))
+                {
+                    return Evaluate(children[2 + i * 2]);
+                }
+            }
+
+            return hasDefault
+                ? Evaluate(children[children.Count - 1])
+                : ExpressionValue.NullValue();
+        }
+
         private static FunctionDefinition ResolveDefinition(Expression node)
         {
             FunctionDefinition definition = null;
@@ -284,9 +358,13 @@ namespace EasyExpression.Internal
 
         private static CultureInfo GetCulture(Expression node)
         {
-            return node.Options != null && node.Options.Culture != null
-                ? node.Options.Culture
-                : ExpressionOptions.Default.Culture;
+            var options = GetOptions(node);
+            return options.Culture ?? ExpressionOptions.Default.Culture;
+        }
+
+        private static ExpressionOptions GetOptions(Expression node)
+        {
+            return node.Options ?? ExpressionOptions.Default;
         }
     }
 }

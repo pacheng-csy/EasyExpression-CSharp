@@ -1,34 +1,43 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+    <LangVersion>7.3</LangVersion>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
     <Title>EasyExpression</Title>
     <PackageIcon>EasyExpression.png</PackageIcon>
     <PackageProjectUrl>https://github.com/pacheng-csy/EasyExpression-CSharp</PackageProjectUrl>
     <Copyright>MIT</Copyright>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/pacheng-csy/EasyExpression-CSharp</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>True</PublishRepositoryUrl>
+    <EmbedUntrackedSources>True</EmbedUntrackedSources>
+    <IncludeSymbols>True</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <PackageTags>expression;logic;relation;arithmetic;tree;</PackageTags>
     <AssemblyVersion>1.0.0.5</AssemblyVersion>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
     <Authors>Pablo Cheng</Authors>
     <FileVersion>1.0.0.5</FileVersion>
-    <Version>1.0.6</Version>
+    <Version Condition="'$(Version)' == ''">1.0.6</Version>
     <Description>支持逻辑表达式、算术表达式、条件表达式的解析及运算，支持自定义函数及函数嵌套，支持转义符</Description>
-    <PackageReleaseNotes></PackageReleaseNotes>
+    <PackageReleaseNotes>新增 ExpressionOptions、函数注册表、CONCAT/IF/CASE/字符串函数；修复空表达式栈溢出、字符串字面量被改写、参数绑定错算、EODate 跨年越界等问题；新增 net8.0 目标与符号包。</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\..\..\..\..\..\文档\EasyExpression.png">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
+    <None Include="EasyExpression.png" Pack="True" PackagePath="\" />
     <None Include="..\README.md">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   </ItemGroup>
 
 </Project>

@@ -3,6 +3,11 @@ using System.Linq;
 
 namespace EasyExpression
 {
+    /// <summary>
+    /// 函数委托：接收按顺序求值后的实参，返回函数结果。
+    /// </summary>
+    /// <param name="values">实参数组。</param>
+    /// <returns>函数结果，支持 double、string、bool、DateTime、TimeSpan 或 null。</returns>
     public delegate object Function(params object[] values);
 
     public class FormulaAction
@@ -101,6 +106,89 @@ namespace EasyExpression
             return values == null
                 ? string.Empty
                 : string.Concat(values.Select(x => x?.ToString() ?? string.Empty));
+        }
+
+        [FunctionRemark("LEN", "[LEN]", "字符串", "1. source", "数值", "字符串长度\r\n[LEN]('abc')，返回3\r\nnull 按空字符串处理")]
+        public static object Len(params object[] values)
+        {
+            return ToText(values, 0).Length;
+        }
+
+        [FunctionRemark("SUBSTR", "[SUBSTR]", "字符串", "1. source \r\n 2. start（从1开始）\r\n 3. length（可选）", "字符串", "截取子串\r\n[SUBSTR]('abcdef',2,3)，返回bcd\r\n[SUBSTR]('abcdef',3)，返回cdef\r\nnull 按空字符串处理")]
+        public static object Substr(params object[] values)
+        {
+            var source = ToText(values, 0);
+            var start = values != null && values.Length > 1 ? Convert.ToInt32(GetValue(values, 1)) : 1;
+            if (start < 1)
+            {
+                start = 1;
+            }
+
+            var offset = start - 1;
+            if (offset >= source.Length)
+            {
+                return string.Empty;
+            }
+
+            if (values != null && values.Length > 2)
+            {
+                var length = Convert.ToInt32(GetValue(values, 2));
+                if (length <= 0)
+                {
+                    return string.Empty;
+                }
+
+                if (offset + length > source.Length)
+                {
+                    length = source.Length - offset;
+                }
+
+                return source.Substring(offset, length);
+            }
+
+            return source.Substring(offset);
+        }
+
+        [FunctionRemark("REPLACE", "[REPLACE]", "字符串", "1. source \r\n 2. oldValue \r\n 3. newValue", "字符串", "替换子串\r\n[REPLACE]('a-b','-','_')，返回a_b\r\noldValue 为空时原样返回")]
+        public static object Replace(params object[] values)
+        {
+            var source = ToText(values, 0);
+            var oldValue = ToText(values, 1);
+            return oldValue.Length == 0 ? source : source.Replace(oldValue, ToText(values, 2));
+        }
+
+        [FunctionRemark("UPPER", "[UPPER]", "字符串", "1. source", "字符串", "转大写\r\n[UPPER]('abc')，返回ABC")]
+        public static object Upper(params object[] values)
+        {
+            return ToText(values, 0).ToUpperInvariant();
+        }
+
+        [FunctionRemark("LOWER", "[LOWER]", "字符串", "1. source", "字符串", "转小写\r\n[LOWER]('ABC')，返回abc")]
+        public static object Lower(params object[] values)
+        {
+            return ToText(values, 0).ToLowerInvariant();
+        }
+
+        [FunctionRemark("TRIM", "[TRIM]", "字符串", "1. source", "字符串", "去除首尾空白\r\n[TRIM]('  abc  ')，返回abc")]
+        public static object Trim(params object[] values)
+        {
+            return ToText(values, 0).Trim();
+        }
+
+        #endregion
+
+        #region Logic
+
+        [FunctionRemark("IF", "[IF]", "逻辑", "1. condition \r\n 2. trueValue \r\n 3. falseValue", "任意", "条件分支，仅计算命中的分支\r\n[IF](a > 0,'正','非正')")]
+        public static object If(params object[] values)
+        {
+            throw new ExpressionException("IF 由求值器惰性执行，不能直接调用");
+        }
+
+        [FunctionRemark("CASE", "[CASE]", "逻辑", "1. value \r\n 2. pattern,result（可多组）\r\n 最后可选的默认值", "任意", "多分支匹配，仅计算命中的分支\r\n[CASE](2,1,'a',2,'b','c')，返回b\r\n[CASE](9,1,'a',2,'b','c')，返回c")]
+        public static object Case(params object[] values)
+        {
+            throw new ExpressionException("CASE 由求值器惰性执行，不能直接调用");
         }
 
         #endregion

@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version, e.g. 1.1.0'
+        required: true
+
+jobs:
+  publish:
+    name: Pack and publish
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            $version = '${{ github.event.inputs.version }}'
+          } else {
+            $version = '${{ github.ref_name }}'.TrimStart('v')
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+') {
+            throw "Invalid version: $version"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build
+        run: dotnet build EasyExpression.sln -c Release -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Test
+        run: dotnet test EasyExpression.UnitTest/EasyExpression.UnitTest.csproj -c Release --no-build
+
+      - name: Pack
+        run: >
+          dotnet pack EasyExpression/EasyExpression.csproj
+          -c Release --no-build
+          -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Push to NuGet
+        run: >
+          dotnet nuget push EasyExpression/bin/Release/*.nupkg
+          --api-key ${{ secrets.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ steps.version.outputs.version }}
+          path: |
+            EasyExpression/bin/Release/*.nupkg
+            EasyExpression/bin/Release/*.snupkg

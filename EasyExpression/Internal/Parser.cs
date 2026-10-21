@@ -212,6 +212,11 @@ namespace EasyExpression.Internal
                 Expect(TokenKind.RightParen, $"函数 {nameToken.Text} 缺少 ')'");
 
                 var definition = FunctionRegistry.Get(nameToken.Text);
+                if (_options != null && !_options.IsFunctionAllowed(nameToken.Text))
+                {
+                    throw new ExpressionException($"位置 {nameToken.Position}: 函数 {nameToken.Text} 不在允许列表中");
+                }
+
                 var function = Expression.CreateNode(_options);
                 function.ElementType = ElementType.Function;
                 function.FunctionType = definition.Type;

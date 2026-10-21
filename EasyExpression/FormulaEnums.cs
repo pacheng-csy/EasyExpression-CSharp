@@ -111,6 +111,38 @@
         /// </summary>
         Concat = 20,
         /// <summary>
+        /// 条件分支(惰性求值)
+        /// </summary>
+        If = 21,
+        /// <summary>
+        /// 多分支匹配(惰性求值)
+        /// </summary>
+        Case = 22,
+        /// <summary>
+        /// 字符串长度
+        /// </summary>
+        Len = 23,
+        /// <summary>
+        /// 截取子串
+        /// </summary>
+        Substr = 24,
+        /// <summary>
+        /// 替换子串
+        /// </summary>
+        Replace = 25,
+        /// <summary>
+        /// 转大写
+        /// </summary>
+        Upper = 26,
+        /// <summary>
+        /// 转小写
+        /// </summary>
+        Lower = 27,
+        /// <summary>
+        /// 去除首尾空白
+        /// </summary>
+        Trim = 28,
+        /// <summary>
         /// 自定义函数(delegate double Function(params object[] values))
         /// </summary>
         Customer = 100
@@ -158,7 +190,7 @@
         /// </summary>
         None = 0,
         /// <summary>
-        /// 与(&)
+        /// 与(&amp;)
         /// </summary>
         [Operator("与", 1, "&")]
         And = 1,
@@ -238,7 +270,7 @@
         /// </summary>
         None = 0,
         /// <summary>
-        /// 与(&)
+        /// 与(&amp;)
         /// </summary>
         And = 1,
         /// <summary>

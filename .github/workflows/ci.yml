@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-latest, ubuntu-latest ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: dotnet build EasyExpression.sln -c Release
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: dotnet build EasyExpression.UnitTest/EasyExpression.UnitTest.csproj -c Release -f net8.0
+
+      - name: Test net8.0
+        run: >
+          dotnet test EasyExpression.UnitTest/EasyExpression.UnitTest.csproj
+          -c Release -f net8.0 --no-build
+          --collect:"XPlat Code Coverage"
+          --results-directory TestResults
+
+      - name: Test net472
+        if: runner.os == 'Windows'
+        run: dotnet test EasyExpression.UnitTest/EasyExpression.UnitTest.csproj -c Release -f net472 --no-build
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}
+          path: TestResults
+
+      - name: Pack
+        if: runner.os == 'Windows'
+        run: >
+          dotnet pack EasyExpression/EasyExpression.csproj
+          -c Release --no-build
+          -p:Version=1.0.${{ github.run_number }}
+
+      - name: Upload packages
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: |
+            EasyExpression/bin/Release/*.nupkg
+            EasyExpression/bin/Release/*.snupkg
