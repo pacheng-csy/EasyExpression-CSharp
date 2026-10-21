@@ -117,3 +117,7 @@ FunctionRegistry.Unregister("TWICE");
 dotnet build EasyExpression.sln -c Release
 dotnet test EasyExpression.UnitTest/EasyExpression.UnitTest.csproj -c Release
 ```
+
+### 设计文档
+
+架构、解析/绑定/求值流程与扩展方式见 [docs/ARCHITECTURE.md](https://github.com/pacheng-csy/EasyExpression-CSharp/blob/master/docs/ARCHITECTURE.md)。
